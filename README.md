@@ -52,7 +52,7 @@ humadity_IoT-main/
 ├── app.py                   # Entry point (REST API; MQTT mode commented out)
 ├── app/                     # App factory, urls.py, path_url/humadity.py, controller/{humadity,mqtt}/main.py
 ├── media/                   # Circuit photo and POST output screenshot
-└── env/                     # Windows virtual environment (committed by mistake)
+└── .gitignore               # Ignores virtual environments and caches
 ```
 
 ## Getting Started
