@@ -1,42 +1,84 @@
-# Humidity IoT System
+# Humidity IoT System (ESP32 + DHT11 + Flask)
 
-This repository contains the source code and documentation for the Humidity IoT System, developed as part of the SIC 5 assignment. The project involves a Flask web application that interacts with a DHT11 sensor connected to an ESP32 microcontroller to monitor and display humidity levels.
+An IoT system that reads temperature and humidity from a DHT11 sensor on an ESP32 and sends the values to a Flask REST API every 2 seconds, where other apps can read the latest reading. It was built as an assignment for SIC 5. An alternative MQTT receiver is also included.
 
-## Table of Contents
+## How It Works
 
-- [Introduction](#introduction)
-- [Features](#features)
-- [Hardware Requirements](#hardware-requirements)
-- [Software Requirements](#software-requirements)
-- [Documentation](#documentation)
+```
+DHT11 ──► ESP32 (post-data.ino): every 2 s read sensor, get NTP time (UTC+7), HTTP POST
+              ▼
+   Flask REST API (app.py): keeps the latest reading in memory
+              ▼
+   GET /api/sensor_data · /api/temperature · /api/humidity
+```
 
-## Introduction
-
-The Humidity IoT System is designed to monitor humidity levels in real-time. Data is collected using a DHT11 sensor connected to an ESP32 microcontroller, which then communicates with a Flask-based web application. This system allows users to view current and historical humidity data through a user-friendly web interface.
+During development the ESP32 posted to the local Flask server through an ngrok tunnel.
 
 ## Features
 
-- Real-time humidity monitoring
-- Historical data visualization
-- User-friendly web interface built with Flask
-- Lightweight and efficient communication between ESP32 and Flask server
+- **Firmware:** reads the DHT11 on GPIO 4, skips invalid readings, adds an NTP timestamp, sends a URL-encoded POST, and logs to the serial monitor.
+- **REST API (Flask-RESTful):** receive a reading and read the latest temperature, humidity, or full record. CORS enabled.
+- **MQTT option:** a Paho client subscribing to `/sensor/data/temperature` and `/sensor/data/humidity` on `test.mosquitto.org`, updating the same in-memory record.
+- **Modular structure:** app factory, URL registration, and controllers in separate modules.
 
-## Hardware Requirements
+## API Endpoints
 
-- **ESP32 microcontroller**
-- **DHT11 humidity sensor**
-- **Breadboard and connecting wires**
-- **Power supply for ESP32**
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/sensor_data` | Receive a reading (form fields `temperature`, `humidity`, `timestamp`) |
+| `GET` | `/api/sensor_data` | Latest reading |
+| `GET` | `/api/temperature` | Latest temperature |
+| `GET` | `/api/humidity` | Latest humidity |
 
-## Software Requirements
+```bash
+curl -X POST http://localhost:5000/api/sensor_data -d "temperature=29.5&humidity=70.0&timestamp=14:05:12"
+```
 
-- **Python 3.x**
-- **Flask**
-- **Arduino IDE**
-- **Additional Python libraries**: `Flask-CORS`, `requests`
+## Hardware
 
-## Documentation
-- **IoT Network**
-![IoT](media/Rangkaian-IoT.jpg)
-- **Output POST Method**
-![Output](media/output.jpg)
+ESP32 board, DHT11 sensor (data pin on GPIO 4), breadboard, jumper wires, USB power.
+
+![IoT circuit](media/Rangkaian-IoT.jpg)
+
+## Tech Stack
+
+Arduino (C++) with `WiFi`, `HTTPClient`, `DHT`, `NTPClient`; Python, Flask 3, Flask-RESTful, Flask-CORS; Paho MQTT; ngrok.
+
+## Project Structure
+
+```
+humadity_IoT-main/
+├── post-data.ino            # ESP32 firmware
+├── app.py                   # Entry point (REST API; MQTT mode commented out)
+├── app/                     # App factory, urls.py, path_url/humadity.py, controller/{humadity,mqtt}/main.py
+├── media/                   # Circuit photo and POST output screenshot
+└── env/                     # Windows virtual environment (committed by mistake)
+```
+
+## Getting Started
+
+```bash
+git clone https://github.com/harrymardika/humadity_IoT-main.git
+cd humadity_IoT-main
+python -m venv .venv && source .venv/bin/activate    # Windows: .venv\Scripts\activate
+pip install flask flask-restful flask-cors paho-mqtt
+python app.py
+```
+
+The API runs at `http://localhost:5000`. To reach it from the ESP32 over the internet, run `ngrok http 5000`.
+
+**Flash the ESP32:** open `post-data.ino` in the Arduino IDE (ESP32 board support), install the Adafruit **DHT sensor library** and **NTPClient**, set your Wi-Fi `ssid`/`password` and `serverName` (your API URL ending in `/api/sensor_data`), upload, and open the serial monitor at 9600 baud.
+
+**MQTT mode:** uncomment the MQTT block in `app.py`, then publish values to the two topics.
+
+Serial output of the POST requests:
+
+![POST output](media/output.jpg)
+
+## Limitations
+
+Only the latest reading is kept in memory (no history or database), CORS allows all origins, and the API has no authentication.
+
+## Author
+
+**Harry Mardika** · [GitHub](https://github.com/harrymardika)
